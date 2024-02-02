@@ -34,6 +34,8 @@
 #include "TPZLinearAnalysis.h"
 #include <TPZVTKGeoMesh.h>
 #include "ProblemData.h"
+#include <TPZSYSMPMatrix.h>
+#include <TPZSYSMPPardiso.h>
 
 const int global_nthread = 0;
 enum EMatid  {ENone, EDomain, EBoundary, EPont, EWrap, EIntface, EPressureHyb};
@@ -44,7 +46,9 @@ TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId);
 template<class tshape>
 TPZGeoMesh* ReadMeshFromGmsh(std::string file_name);
 
-void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, bool filterEquations, bool domainHybridization);
+void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh);
+
+void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol);
 
 void PrintResults(TPZLinearAnalysis &an, TPZCompMesh *cmesh, int resolution = 0);
 
@@ -69,7 +73,7 @@ int main(int argc, char *argv[])
     #ifdef PZ_LOG
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
-    const int xdiv = 1;
+    const int xdiv = 5;
     const int pOrder = 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     
@@ -84,7 +88,7 @@ int main(int argc, char *argv[])
     hdivCreator.SetExtraInternalOrder(0);
     hdivCreator.SetShouldCondense(true);
     // hdivCreator.SetShouldCondense(false);
-    hdivCreator.HybridType() = HybridizationType::ESemi;
+    hdivCreator.HybridType() = HybridizationType::ENone;
     // hdivCreator.HybridType() = HybridizationType::EStandard;
 
     // Prints gmesh mesh properties
@@ -130,7 +134,8 @@ int main(int argc, char *argv[])
     an.SetExact(exactSol,solOrder);
 
     bool domHyb = false;
-    SolveProblemDirect(an, cmesh, false, domHyb);
+    // SolveProblemDirect(an, cmesh);
+    SolveProblemIterative(an, cmesh, 0.01, 1.e-9);
     clock.stop();
 
     std::cout << "--------- PostProcess ---------" << std::endl;
@@ -184,7 +189,7 @@ TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId)
     return gmesh;
 }
 
-void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, bool filterEquations, bool domainHybridization)
+void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh)
 {
     TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
     
@@ -204,12 +209,105 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, bool filterEq
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     std::cout << "Time Assemble = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
+    auto K = an.MatrixSolver<STATE>().Matrix();
+    {
+        std::ofstream file("matrix");
+        K->Print("GK", file, EMathematicaInput);
+    }
+
     ///solves the system
     std::chrono::steady_clock::time_point begin2 = std::chrono::steady_clock::now();
     an.Solve();
     std::chrono::steady_clock::time_point end2 = std::chrono::steady_clock::now();
     std::cout << "Time Solve = " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - begin2).count() << "[ms]" << std::endl;
 }
+
+void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol)
+{
+    TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
+    
+    matskl.SetNumThreads(global_nthread);
+    
+    an.SetStructuralMatrix(matskl);
+    
+    ///Setting a direct solver
+    TPZStepSolver<STATE> step;
+    step.SetDirect(ELDLt);//ELU //ECholesky // ELDLt
+    
+    an.SetSolver(step);
+
+    //assembles the system
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    an.Assemble();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "Time Assemble = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
+    //Gettig the Global stiffness matrix from solver
+    auto KG = an.MatrixSolver<STATE>().Matrix();
+    {
+        std::ofstream file("matrix_original.txt");
+        KG->Print("GK", file, EMathematicaInput);
+        an.Rhs().Print("rhs", file, EMathematicaInput);
+    }
+
+    //Copying KG to K_it
+    auto* K_it = dynamic_cast<TPZSYsmpMatrixPardiso<STATE>*>(KG->Clone());
+    if (!K_it) DebugStop();
+
+    //Adding -alpha to the zeroes diagonals of K_it
+    for (TPZConnect con : cmesh->ConnectVec())
+    {
+        if (con.LagrangeMultiplier() != 1 || con.IsCondensed()) continue;
+        int64_t seq = con.SequenceNumber();
+        int64_t eq = cmesh->Block().Position(seq);
+        K_it->PutVal(eq, eq, -alpha);
+    }
+    {
+        std::ofstream file("matrix_compressible.txt");
+        K_it->Print("Kcomp", file, EMathematicaInput);
+    }
+    
+    TPZFMatrix<STATE> force = an.Rhs();
+    TPZFMatrix<STATE> rhs = force;
+    TPZFMatrix<STATE> dsol = rhs;
+    TPZFMatrix<STATE> sol(rhs.Rows(),1,0.);
+
+    //Solving
+    double norm_dsol=1.0, norm_rhs=1.0;
+    int nit = 0;
+    const int size = rhs.Rows();
+    while (norm_dsol > tol || norm_rhs > tol)
+    {
+        K_it->SolveDirect(dsol,ELDLt);
+        sol += dsol;
+        KG->MultAdd(sol, force, rhs, -1.0, 1.0); //Computing the residual rhs = F - KG.sol
+
+        nit++;
+        norm_dsol = 0.0;
+        norm_rhs = 0.0;
+        for (int64_t i = 0; i < size; i++)
+        {
+            norm_dsol += dsol(i,0) * dsol(i,0);
+            norm_rhs += rhs(i,0) * rhs(i,0);
+        }
+        norm_dsol = sqrt(norm_dsol);
+        norm_rhs = sqrt(norm_rhs);
+        dsol=rhs;
+        std::cout << "Iteration: " << nit << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
+
+        if (nit > 50)
+        {
+            std::cout << "Solver diverged.\n";
+            break;
+        }
+    }
+    
+    //Transfering the solution to the mesh
+    an.Solution() = sol;
+    an.LoadSolution();
+    cmesh->TransferMultiphysicsSolution();
+}
+
 
 void PrintResults(TPZLinearAnalysis &an, TPZCompMesh *cmesh, int resolution)
 {
