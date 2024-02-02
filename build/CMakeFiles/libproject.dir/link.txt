@@ -1,1 +1,0 @@
-/usr/bin/g++ -fPIC -g -shared -Wl,-soname,liblibproject.so -o liblibproject.so CMakeFiles/libproject.dir/sources/ProblemData.cpp.o  -Wl,-rpath,/opt/neopz/pz/lib /opt/neopz/pz/lib/libpz.so 
