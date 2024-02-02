@@ -1,0 +1,110 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1,
+						2
+					],
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						2
+					]
+				},
+				{
+					"build" : "sources",
+					"jsonFile" : "directory-sources-Debug-955aaa90cb69d097e9b1.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "sources"
+				},
+				{
+					"build" : "targets",
+					"jsonFile" : "directory-targets-Debug-9e0fec3e7c298ffbbd9a.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.14"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 0,
+					"source" : "targets",
+					"targetIndexes" : 
+					[
+						1
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0,
+						1,
+						2
+					],
+					"name" : "Iterative-Saddle-Point",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "GlobalFiles::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-GlobalFiles-Debug-89fede817aa4be694416.json",
+					"name" : "GlobalFiles",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 2,
+					"id" : "iterative-no-condense-darcy::@d4efab447377cb18a7aa",
+					"jsonFile" : "target-iterative-no-condense-darcy-Debug-d28e0fd8cfb7b5d129de.json",
+					"name" : "iterative-no-condense-darcy",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "libproject::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-libproject-Debug-5098eaa34c702465d4c4.json",
+					"name" : "libproject",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/giavancini/Dev/Iterative-Saddle-Point/build",
+		"source" : "/home/giavancini/Dev/Iterative-Saddle-Point"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 5
+	}
+}

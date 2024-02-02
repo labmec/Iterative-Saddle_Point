@@ -1,0 +1,59 @@
+
+		COMPUTABLE GRID INFORMATIONS:
+
+TITLE-> Pressure
+
+number of connects            = 1
+number of elements            = 1
+number of materials           = 2
+dimension of the mesh         = 2
+
+	 Connect Information:
+
+ Index 0 TPZConnect : Sequence number = 0  Order = 0  NState = 1  NShape 1 IsCondensed 0 IsLagrMult 1	Equation = 0	NumElCon = 1 Block size 1 Solution 0 
+
+	 Computable Element Information:
+
+
+ Index 0 
+Discontinous element : 
+
+Output for a computable element index: 0
+fReferenceIndex 0
+Center coordinate: 0.5, 0.5, 0.5
+Material id 1
+Number of connects = 1
+Connect indexes : 0 
+	Geometric reference index : 0
+	Material id : 1
+	Degree of interpolation : 0
+	Connect index : 0
+	Using qsieta : 1
+	Normalizing constant : 1
+	Center point of the element : stored qsieta 0, 0, 0 computed xy 0.5, 0.5, 0.5
+	Dimension : 3
+	Reference Index = 0
+
+
+	 Material Information:
+
+material index 1
+void TPZNullMaterial<TVar>::Print(std::ostream&) const [with TVar = double; std::ostream = std::basic_ostream<char>]
+virtual void TPZMaterial::Print(std::ostream&) const
+Material Id: 1
+Dimension: 3
+Num state variables: 1
+Has forcing function: no
+Dimension 3
+NState 1
+
+material index 30
+void TPZNullMaterial<TVar>::Print(std::ostream&) const [with TVar = double; std::ostream = std::basic_ostream<char>]
+virtual void TPZMaterial::Print(std::ostream&) const
+Material Id: 30
+Dimension: 2
+Num state variables: 1
+Has forcing function: no
+Dimension 2
+NState 1
+

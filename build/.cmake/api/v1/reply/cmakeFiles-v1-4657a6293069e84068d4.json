@@ -1,0 +1,174 @@
+{
+	"inputs" : 
+	[
+		{
+			"path" : "CMakeLists.txt"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.26.3/CMakeSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeSystemSpecificInitialize.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.26.3/CMakeCCompiler.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "build/CMakeFiles/3.26.3/CMakeCXXCompiler.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeSystemSpecificInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeGenericSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeInitializeConfigs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Platform/Linux.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeCInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Compiler/GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Platform/Linux-GNU-C.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeCXXInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Compiler/GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Platform/Linux-GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/neopz/lib/cmake/neopz/NeoPZConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/neopz/lib/cmake/neopz/NeoPZConfig.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/neopz/lib/cmake/neopz/NeoPZTargets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/neopz/lib/cmake/neopz/NeoPZTargets-debug.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/neopz/lib/cmake/neopz/add_pz_target.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/usr/local/share/cmake-3.26/Modules/CMakeParseArguments.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/opt/neopz/lib/cmake/neopz/check_pz_opt.cmake"
+		},
+		{
+			"path" : "sources/CMakeLists.txt"
+		},
+		{
+			"path" : "targets/CMakeLists.txt"
+		},
+		{
+			"path" : "targets/meshpath_config.h.in"
+		}
+	],
+	"kind" : "cmakeFiles",
+	"paths" : 
+	{
+		"build" : "/home/giavancini/Dev/Iterative-Saddle-Point/build",
+		"source" : "/home/giavancini/Dev/Iterative-Saddle-Point"
+	},
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 0
+	}
+}

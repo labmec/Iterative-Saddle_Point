@@ -1,0 +1,9 @@
+/home/giavancini/Dev/Iterative-Saddle-Point/build/CMakeFiles/libproject.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/CMakeFiles/GlobalFiles.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/CMakeFiles/edit_cache.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/CMakeFiles/rebuild_cache.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/sources/CMakeFiles/edit_cache.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/sources/CMakeFiles/rebuild_cache.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/targets/CMakeFiles/iterative-no-condense-darcy.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/targets/CMakeFiles/edit_cache.dir
+/home/giavancini/Dev/Iterative-Saddle-Point/build/targets/CMakeFiles/rebuild_cache.dir
