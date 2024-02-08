@@ -34,8 +34,11 @@
 #include "TPZLinearAnalysis.h"
 #include <TPZVTKGeoMesh.h>
 #include "ProblemData.h"
-#include <TPZSYSMPMatrix.h>
+#include <TPZYSMPMatrix.h>
 #include <TPZSYSMPPardiso.h>
+#include "TPZMixedCompressibleDarcyFlow.h"
+#include <pzcondensedcompel.h>
+#include <pzelchdiv.h>
 
 const int global_nthread = 0;
 enum EMatid  {ENone, EDomain, EBoundary, EPont, EWrap, EIntface, EPressureHyb};
@@ -99,7 +102,8 @@ int main(int argc, char *argv[])
     }
 
     //Insert Materials
-    TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
+    // TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
+    TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,0.0);
     matdarcy->SetConstantPermeability(1.);
     matdarcy->SetExactSol(exactSol,4);
 
@@ -242,6 +246,83 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     std::cout << "Time Assemble = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
+    //Computing the number of hdiv domain elements, the number of face connects and their number of hdiv face functions
+    TPZMultiphysicsCompMesh* cmesh_m = dynamic_cast<TPZMultiphysicsCompMesh*>(cmesh);
+    TPZCompMesh* cmesh_u = cmesh_m->MeshVector()[0];
+    int64_t nel_u = cmesh_u->NElements();
+    int64_t nElements = 0;
+    int64_t nFaceConnects = 0;
+    int64_t maxElementNeq = 0;
+
+    for (int64_t iel = 0; iel < nel_u; iel++)
+    {
+        TPZCompEl *cel = cmesh_u->Element(iel);
+        if (!cel) continue;
+        if (cel->Dimension() != cmesh->Dimension()) continue;
+        
+        TPZGeoEl *gel = cel->Reference();
+        nFaceConnects += gel->NSides(cmesh->Dimension()-1);
+        nElements++;
+        int nconnects = cel->NConnects();
+        int nElementShape = 0;
+        for (int ic = 0; ic < nconnects; ic++)
+        {
+            TPZConnect con = cel->Connect(ic);
+            if (con.IsCondensed() || con.HasDependency() || con.NElConnected() == 1) continue;
+            nElementShape += cel->Connect(ic).NShape();
+        }
+        if (nElementShape > maxElementNeq)
+        {
+            maxElementNeq = nElementShape;
+        }
+    }
+
+    /*
+    For Hdiv constant space, the global matrix B has dimensions (maxElementNeq x nElements)
+    and only has contribution of the constant flux dof of each face equal to -fsideorient.
+    Thus the number of nonzeros of B is nFaceConnects.
+    */
+    TPZVec<int64_t> iB(nElements+1,0);
+    TPZVec<int64_t> jB(nFaceConnects,0);
+    TPZVec<STATE> valB(nFaceConnects,0.);
+
+    int64_t row = 0;
+    int count = 0;
+    for (int64_t iel = 0; iel < nel_u; iel++)
+    {
+        int64_t col = 0;
+        TPZCompEl *cel = cmesh_u->Element(iel);
+        if (!cel) continue;
+        if (cel->Dimension() != cmesh->Dimension()) continue;
+        TPZGeoEl *gel = cel->Reference();
+        int nsides = gel->NSides();
+        int nfacets = gel->NSides(gel->Dimension()-1);
+        int eqcont = 0;
+        iB[row+1] = iB[row] + nfacets;
+        
+        for (int iside = gel->NCornerNodes(); iside < nsides-1; iside++)
+        {
+            if (gel->SideDimension(iside) != cmesh->Dimension() - 1) continue; //only the facets
+            REAL side_orient = gel->NormalOrientation(iside);
+            valB[count] = -side_orient;
+            jB[count] = col;
+
+            //Sum to the row index the number of shape functions of the connect
+            TPZCompElSide celside(cel,iside);
+            int connect_id = celside.ConnectIndex();
+            TPZConnect con = cmesh_u->ConnectVec()[connect_id];
+            col += con.NShape();
+            count++; 
+        }
+        row++;
+    }
+    TPZFYsmpMatrix<STATE> B(nElements,maxElementNeq);
+    B.SetData(iB,jB,valB);
+    {
+        std::ofstream file("matrix_B.txt");
+        B.Print("B", file, EMathematicaInput);
+    }
+    
     //Gettig the Global stiffness matrix from solver
     auto KG = an.MatrixSolver<STATE>().Matrix();
     {
@@ -307,7 +388,6 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     an.LoadSolution();
     cmesh->TransferMultiphysicsSolution();
 }
-
 
 void PrintResults(TPZLinearAnalysis &an, TPZCompMesh *cmesh, int resolution)
 {
