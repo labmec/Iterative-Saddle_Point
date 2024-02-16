@@ -35,6 +35,7 @@
 #include <TPZVTKGeoMesh.h>
 #include "ProblemData.h"
 #include <TPZYSMPMatrix.h>
+#include <TPZYSMPPardiso.h>
 #include <TPZSYSMPPardiso.h>
 #include "TPZMixedCompressibleDarcyFlow.h"
 #include <pzcondensedcompel.h>
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
     #ifdef PZ_LOG
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
-    const int xdiv = 2;
+    const int xdiv = 1;
     const int pOrder = 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     
@@ -90,6 +91,7 @@ int main(int argc, char *argv[])
     hdivCreator.SetDefaultOrder(pOrder);
     hdivCreator.SetExtraInternalOrder(0);
     hdivCreator.SetShouldCondense(true);
+    hdivCreator.SetShouldCondensePressure(true);
     // hdivCreator.SetShouldCondense(false);
     hdivCreator.HybridType() = HybridizationType::ENone;
     // hdivCreator.HybridType() = HybridizationType::EStandard;
@@ -103,7 +105,7 @@ int main(int argc, char *argv[])
 
     //Insert Materials
     // TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
-    TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,0.0);
+    TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,0.01);
     matdarcy->SetConstantPermeability(1.);
     matdarcy->SetExactSol(exactSol,4);
 
@@ -134,7 +136,7 @@ int main(int argc, char *argv[])
     int nEquationsCondensed = cmesh->NEquations();
     std::cout << "Number of equations condensed = " << nEquationsCondensed << std::endl;
     //Create analysis environment
-    TPZLinearAnalysis an(cmesh, RenumType::EMetis);
+    TPZLinearAnalysis an(cmesh, RenumType::ENone);
     an.SetExact(exactSol,solOrder);
 
     bool domHyb = false;
@@ -236,7 +238,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     
     ///Setting a direct solver
     TPZStepSolver<STATE> step;
-    step.SetDirect(ELDLt);//ELU //ECholesky // ELDLt
+    step.SetDirect(ECholesky);//ELU //ECholesky // ELDLt
     
     an.SetSolver(step);
 
@@ -246,13 +248,13 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     std::cout << "Time Assemble = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
 
-    //Computing the number of hdiv domain elements, the number of face connects and their number of hdiv face functions
+    //Computing the number of hdiv domain elements, the number of facet connects and the number of facet equations
     TPZMultiphysicsCompMesh* cmesh_m = dynamic_cast<TPZMultiphysicsCompMesh*>(cmesh);
     TPZCompMesh* cmesh_u = cmesh_m->MeshVector()[0];
     int64_t nel_u = cmesh_u->NElements();
     int64_t nElements = 0;
-    int64_t nFaceConnects = 0;
-    int64_t maxElementNeq = 0;
+    int64_t nFacetConnects = 0;
+    int64_t nFacetEqs = 0;
 
     for (int64_t iel = 0; iel < nel_u; iel++)
     {
@@ -261,30 +263,24 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         if (cel->Dimension() != cmesh->Dimension()) continue;
         
         TPZGeoEl *gel = cel->Reference();
-        nFaceConnects += gel->NSides(cmesh->Dimension()-1);
+        nFacetConnects += gel->NSides(cmesh->Dimension()-1);
         nElements++;
-        int nconnects = cel->NConnects();
-        int nElementShape = 0;
-        for (int ic = 0; ic < nconnects; ic++)
-        {
-            TPZConnect con = cel->Connect(ic);
-            if (con.IsCondensed() || con.HasDependency() || con.NElConnected() == 1) continue;
-            nElementShape += cel->Connect(ic).NShape();
-        }
-        if (nElementShape > maxElementNeq)
-        {
-            maxElementNeq = nElementShape;
-        }
+    }
+    
+    for (auto& c : cmesh_u->ConnectVec())
+    {
+        if (c.LagrangeMultiplier() != 0 || c.HasDependency() || c.IsCondensed() || c.NElConnected() == 1) continue;
+        nFacetEqs += c.NShape();
     }
 
     /*
-    For Hdiv constant space, the global matrix B has dimensions (maxElementNeq x nElements)
+    For Hdiv constant space, the global matrix B has dimensions (nFacetEqs x nElements)
     and only has contribution of the constant flux dof of each face equal to -fsideorient.
     Thus the number of nonzeros of B is nFaceConnects.
     */
-    TPZVec<int64_t> iB(nElements+1,0);
-    TPZVec<int64_t> jB(nFaceConnects,0);
-    TPZVec<STATE> valB(nFaceConnects,0.);
+    TPZVec<int64_t> iBT(nElements+1,0);
+    TPZVec<int64_t> jBT(nFacetConnects,0);
+    TPZVec<STATE> valBT(nFacetConnects,0.);
 
     int64_t row = 0;
     int count = 0;
@@ -298,29 +294,29 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         int nsides = gel->NSides();
         int nfacets = gel->NSides(gel->Dimension()-1);
         int eqcont = 0;
-        iB[row+1] = iB[row] + nfacets;
+        iBT[row+1] = iBT[row] + nfacets;
         
         for (int iside = gel->NCornerNodes(); iside < nsides-1; iside++)
         {
             if (gel->SideDimension(iside) != cmesh->Dimension() - 1) continue; //only the facets
             REAL side_orient = gel->NormalOrientation(iside);
-            valB[count] = -side_orient;
-            jB[count] = col;
-
-            //Sum to the row index the number of shape functions of the connect
+            valBT[count] = -side_orient;
             TPZCompElSide celside(cel,iside);
             int connect_id = celside.ConnectIndex();
             TPZConnect con = cmesh_u->ConnectVec()[connect_id];
-            col += con.NShape();
+            int64_t seq = con.SequenceNumber();
+            col = cmesh->Block().Position(seq);
+            jBT[count] = col;
             count++; 
         }
         row++;
     }
-    TPZFYsmpMatrix<STATE> B(nElements,maxElementNeq);
-    B.SetData(iB,jB,valB);
+
+    TPZFYsmpMatrixPardiso<STATE> BT(nElements,nFacetEqs);
+    BT.SetData(iBT,jBT,valBT);
     {
         std::ofstream file("matrix_B.txt");
-        B.Print("B", file, EMathematicaInput);
+        BT.Print("BT", file, EMathematicaInput);
     }
     
     //Gettig the Global stiffness matrix from solver
@@ -330,39 +326,38 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         KG->Print("GK", file, EMathematicaInput);
         an.Rhs().Print("rhs", file, EMathematicaInput);
     }
-
-    //Copying KG to K_it
-    auto* K_it = dynamic_cast<TPZSYsmpMatrixPardiso<STATE>*>(KG->Clone());
-    if (!K_it) DebugStop();
-
-    //Adding -alpha to the zeroes diagonals of K_it
-    for (TPZConnect con : cmesh->ConnectVec())
-    {
-        if (con.LagrangeMultiplier() != 1 || con.IsCondensed()) continue;
-        int64_t seq = con.SequenceNumber();
-        int64_t eq = cmesh->Block().Position(seq);
-        K_it->PutVal(eq, eq, -alpha);
-    }
-    {
-        std::ofstream file("matrix_compressible.txt");
-        K_it->Print("Kcomp", file, EMathematicaInput);
-    }
     
     TPZFMatrix<STATE> force = an.Rhs();
-    TPZFMatrix<STATE> rhs = force;
-    TPZFMatrix<STATE> dsol = rhs;
-    TPZFMatrix<STATE> sol(rhs.Rows(),1,0.);
+    TPZFMatrix<STATE> rhs(cmesh->NEquations(),1,0.);
+    TPZFMatrix<STATE> dsol(cmesh->NEquations(),1,0.);
 
-    //Solving
+    //Obtaining the initial solution
+    an.Solve();
+    TPZFMatrix<STATE> sol = an.Solution();
+    {
+        std::ofstream file("sol.txt");
+        sol.Print("sol", file, EMathematicaInput);
+    }
+    
+    //Computing the residual (force is not used)
+    TPZFMatrix<STATE> aux(nElements,1,0.);
+    BT.MultAdd(sol, force, aux, 1.0, 0.0); //dsol = BT * sol
+    BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = Transpose(BT) * dsol = Transpose(BT) * BT * sol
+    dsol = rhs;
+    {
+        std::ofstream file("rhs.txt");
+        rhs.Print("rhs", file, EMathematicaInput);
+    }
     double norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
     const int size = rhs.Rows();
     while (norm_dsol > tol || norm_rhs > tol)
     {
-        K_it->SolveDirect(dsol,ELDLt);
+        KG->SolveDirect(dsol,ECholesky);
         sol += dsol;
-        KG->MultAdd(sol, force, rhs, -1.0, 1.0); //Computing the residual rhs = F - KG.sol
-
+        //Updating the residual (force is not used)
+        BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
+        BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = Transpose(BT) * aux = Transpose(BT) * BT * sol
         nit++;
         norm_dsol = 0.0;
         norm_rhs = 0.0;
