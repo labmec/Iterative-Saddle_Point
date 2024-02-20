@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     #ifdef PZ_LOG
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
-    const int xdiv = 1;
+    const int xdiv = 5;
     const int pOrder = 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     
@@ -105,7 +105,8 @@ int main(int argc, char *argv[])
 
     //Insert Materials
     // TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
-    TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,0.01);
+    REAL alpha = 0.0001;
+    TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,alpha);
     matdarcy->SetConstantPermeability(1.);
     matdarcy->SetExactSol(exactSol,4);
 
@@ -141,7 +142,7 @@ int main(int argc, char *argv[])
 
     bool domHyb = false;
     // SolveProblemDirect(an, cmesh);
-    SolveProblemIterative(an, cmesh, 0.01, 1.e-9);
+    SolveProblemIterative(an, cmesh, alpha, 1.e-9);
     clock.stop();
 
     std::cout << "--------- PostProcess ---------" << std::endl;
@@ -295,19 +296,30 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         int nfacets = gel->NSides(gel->Dimension()-1);
         int eqcont = 0;
         iBT[row+1] = iBT[row] + nfacets;
-        
-        for (int iside = gel->NCornerNodes(); iside < nsides-1; iside++)
+        std::set<int64_t> connectlist;
+        cel->BuildConnectList(connectlist);
+        for (auto it = connectlist.begin(); it != connectlist.end(); it++)
         {
-            if (gel->SideDimension(iside) != cmesh->Dimension() - 1) continue; //only the facets
-            REAL side_orient = gel->NormalOrientation(iside);
-            valBT[count] = -side_orient;
-            TPZCompElSide celside(cel,iside);
-            int connect_id = celside.ConnectIndex();
-            TPZConnect con = cmesh_u->ConnectVec()[connect_id];
+            TPZConnect &con = cmesh_m->ConnectVec()[*it];
+
+            if (con.LagrangeMultiplier() != 0 || con.HasDependency() || con.IsCondensed() || con.NElConnected() == 1) continue;
+
+            for (int iside = gel->NCornerNodes(); iside < nsides-1; iside++)
+            {
+                if (gel->SideDimension(iside) != cmesh->Dimension() - 1) continue; // only the facets
+                TPZCompElSide celside(cel, iside);
+                int64_t connect_id = celside.ConnectIndex();
+                if (connect_id == *it)
+                {
+                    REAL side_orient = gel->NormalOrientation(iside);
+                    valBT[count] = -side_orient;
+                    break;
+                }
+            }
             int64_t seq = con.SequenceNumber();
-            col = cmesh->Block().Position(seq);
+            col = cmesh_m->Block().Position(seq);
             jBT[count] = col;
-            count++; 
+            count++;
         }
         row++;
     }
@@ -341,13 +353,14 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     
     //Computing the residual (force is not used)
     TPZFMatrix<STATE> aux(nElements,1,0.);
-    BT.MultAdd(sol, force, aux, 1.0, 0.0); //dsol = BT * sol
-    BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = Transpose(BT) * dsol = Transpose(BT) * BT * sol
+    BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
+    BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = -Transpose(BT) * aux / alpha = -Transpose(BT) * BT * sol / alpha
     dsol = rhs;
     {
         std::ofstream file("rhs.txt");
         rhs.Print("rhs", file, EMathematicaInput);
     }
+    
     double norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
     const int size = rhs.Rows();
@@ -371,7 +384,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         dsol=rhs;
         std::cout << "Iteration: " << nit << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
 
-        if (nit > 50)
+        if (nit > 200)
         {
             std::cout << "Solver diverged.\n";
             break;
