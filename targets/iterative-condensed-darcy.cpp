@@ -41,7 +41,7 @@
 #include <pzcondensedcompel.h>
 #include <pzelchdiv.h>
 
-const int global_nthread = 0;
+const int global_nthread = 8;
 enum EMatid  {ENone, EDomain, EBoundary, EPont, EWrap, EIntface, EPressureHyb};
 
 template<class tshape>
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     #ifdef PZ_LOG
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
-    const int xdiv = 5;
+    const int xdiv = 20;
     const int pOrder = 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     
@@ -92,7 +92,6 @@ int main(int argc, char *argv[])
     hdivCreator.SetExtraInternalOrder(0);
     hdivCreator.SetShouldCondense(true);
     hdivCreator.SetShouldCondensePressure(true);
-    // hdivCreator.SetShouldCondense(false);
     hdivCreator.HybridType() = HybridizationType::ENone;
     // hdivCreator.HybridType() = HybridizationType::EStandard;
 
@@ -105,7 +104,7 @@ int main(int argc, char *argv[])
 
     //Insert Materials
     // TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
-    REAL alpha = 0.0001;
+    REAL alpha = 0.00001;
     TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,alpha);
     matdarcy->SetConstantPermeability(1.);
     matdarcy->SetExactSol(exactSol,4);
@@ -127,7 +126,7 @@ int main(int argc, char *argv[])
     }
   
     // Number of equations without condense elements
-    const int nEquationsFull = cmesh->NEquations();
+    const int nEquationsFull = cmesh->Solution().Rows();
     std::cout << "Number of equations = " << nEquationsFull << std::endl;
 
     TPZTimer clock,clock2;
@@ -137,7 +136,7 @@ int main(int argc, char *argv[])
     int nEquationsCondensed = cmesh->NEquations();
     std::cout << "Number of equations condensed = " << nEquationsCondensed << std::endl;
     //Create analysis environment
-    TPZLinearAnalysis an(cmesh, RenumType::ENone);
+    TPZLinearAnalysis an(cmesh, RenumType::EMetis);
     an.SetExact(exactSol,solOrder);
 
     bool domHyb = false;
@@ -215,12 +214,6 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh)
     an.Assemble();
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     std::cout << "Time Assemble = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-
-    auto K = an.MatrixSolver<STATE>().Matrix();
-    {
-        std::ofstream file("matrix");
-        K->Print("GK", file, EMathematicaInput);
-    }
 
     ///solves the system
     std::chrono::steady_clock::time_point begin2 = std::chrono::steady_clock::now();
@@ -326,44 +319,35 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
 
     TPZFYsmpMatrixPardiso<STATE> BT(nElements,nFacetEqs);
     BT.SetData(iBT,jBT,valBT);
-    {
-        std::ofstream file("matrix_B.txt");
-        BT.Print("BT", file, EMathematicaInput);
-    }
     
     //Gettig the Global stiffness matrix from solver
     auto KG = an.MatrixSolver<STATE>().Matrix();
-    {
-        std::ofstream file("matrix_original.txt");
-        KG->Print("GK", file, EMathematicaInput);
-        an.Rhs().Print("rhs", file, EMathematicaInput);
-    }
     
     TPZFMatrix<STATE> force = an.Rhs();
     TPZFMatrix<STATE> rhs(cmesh->NEquations(),1,0.);
     TPZFMatrix<STATE> dsol(cmesh->NEquations(),1,0.);
 
     //Obtaining the initial solution
+    begin = std::chrono::steady_clock::now();
     an.Solve();
     TPZFMatrix<STATE> sol = an.Solution();
-    {
-        std::ofstream file("sol.txt");
-        sol.Print("sol", file, EMathematicaInput);
-    }
+    end = std::chrono::steady_clock::now();
+    std::cout << "Time for Initial Solver = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
     //Computing the residual (force is not used)
     TPZFMatrix<STATE> aux(nElements,1,0.);
     BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
     BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = -Transpose(BT) * aux / alpha = -Transpose(BT) * BT * sol / alpha
     dsol = rhs;
-    {
-        std::ofstream file("rhs.txt");
-        rhs.Print("rhs", file, EMathematicaInput);
-    }
+
+    //Computing initial pressure (force is not used)
+    TPZFMatrix<STATE> pressure(nElements,1,0.);
+    BT.MultAdd(sol, force, pressure, 1.0/alpha, 0.0); //pressure = BT * sol / alpha
     
     double norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
     const int size = rhs.Rows();
+    begin = std::chrono::steady_clock::now();
     while (norm_dsol > tol || norm_rhs > tol)
     {
         KG->SolveDirect(dsol,ECholesky);
@@ -371,6 +355,10 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         //Updating the residual (force is not used)
         BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
         BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = Transpose(BT) * aux = Transpose(BT) * BT * sol
+        //Updating pressure (force is not used)
+        TPZFMatrix<STATE> dp(nElements,1,0.);
+        BT.MultAdd(sol, force, dp, 1.0/alpha, 0.0); //dp = BT * sol / alpha
+        pressure += dp;
         nit++;
         norm_dsol = 0.0;
         norm_rhs = 0.0;
@@ -391,9 +379,23 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         }
     }
     
+    end = std::chrono::steady_clock::now();
+    std::cout << "Time Iterative Process = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
     //Transfering the solution to the mesh
     an.Solution() = sol;
     an.LoadSolution();
+
+    TPZFMatrix<REAL>& mesh_sol = cmesh->Solution();
+    const int64_t nEquationsFull = mesh_sol.Rows();
+    for (const TPZConnect& con : cmesh->ConnectVec())
+    {
+        if (con.LagrangeMultiplier() != 1) continue; //only pressure connect
+        int64_t seq = con.SequenceNumber();
+        int64_t pos = cmesh->Block().Position(seq);
+        int64_t posloc = pos - (nEquationsFull - nElements); //position in the local pressure solution
+        mesh_sol(pos,0) = pressure(posloc, 0);
+    }
     cmesh->TransferMultiphysicsSolution();
 }
 
