@@ -40,21 +40,28 @@
 #include "TPZMixedCompressibleDarcyFlow.h"
 #include <pzcondensedcompel.h>
 #include <pzelchdiv.h>
+#include "createFile.h"
+#include "dataFile.h"
 
 const int global_nthread = 8;
 enum EMatid  {ENone, EDomain, EBoundary, EPont, EWrap, EIntface, EPressureHyb};
 
+
+//describes what a function or class looks like. Unlike a normal definition (where all types must 
+//be specified), in a template we can use one or more placeholder types. A placeholder type represents 
+//some type that is not known at the time the template is written, but that will be provided later.
 template<class tshape>
 TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId);
 
 template<class tshape>
 TPZGeoMesh* ReadMeshFromGmsh(std::string file_name);
 
-void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh);
+void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::fstream* file);
 
-void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol);
+void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol, std::fstream* file);
 
 void PrintResults(TPZLinearAnalysis &an, TPZCompMesh *cmesh, int resolution = 0);
+
 
 //Analytical solution
 constexpr int solOrder{4};
@@ -74,10 +81,14 @@ auto exactSol = [](const TPZVec<REAL> &loc,
 
 int main(int argc, char *argv[])
 {
+    std::fstream my_file; //creating file object of data type fstream
+    //create_file(&my_file); //for iterative file
+    //create_file2(&my_file2); //for direct file
+    
     #ifdef PZ_LOG
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
-    const int xdiv = 20;
+    const int xdiv = 35;
     const int pOrder = 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     
@@ -93,7 +104,7 @@ int main(int argc, char *argv[])
     hdivCreator.SetShouldCondense(true);
     hdivCreator.SetShouldCondensePressure(true);
     hdivCreator.HybridType() = HybridizationType::ENone;
-    // hdivCreator.HybridType() = HybridizationType::EStandard;
+    //hdivCreator.HybridType() = HybridizationType::EStandard;
 
     // Prints gmesh mesh properties
     {
@@ -103,7 +114,7 @@ int main(int argc, char *argv[])
     }
 
     //Insert Materials
-    // TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
+    //TPZMixedDarcyFlow* matdarcy = new TPZMixedDarcyFlow(EDomain,dim);
     REAL alpha = 0.00001;
     TPZMixedCompressibleDarcyFlow* matdarcy = new TPZMixedCompressibleDarcyFlow(EDomain,dim,alpha);
     matdarcy->SetConstantPermeability(1.);
@@ -139,9 +150,13 @@ int main(int argc, char *argv[])
     TPZLinearAnalysis an(cmesh, RenumType::EMetis);
     an.SetExact(exactSol,solOrder);
 
+    write_solverData(&my_file, alpha, xdiv, nEquationsFull, nEquationsCondensed);
+    //write_directData(&my_file2, xdiv, nEquationsFull, nEquationsCondensed);
+    //creat_file3(&my_file3, xdiv, alpha); //for norms file
+
     bool domHyb = false;
-    // SolveProblemDirect(an, cmesh);
-    SolveProblemIterative(an, cmesh, alpha, 1.e-9);
+    //SolveProblemDirect(an, cmesh, &my_file2);
+    SolveProblemIterative(an, cmesh, alpha, 1.e-9, &my_file);
     clock.stop();
 
     std::cout << "--------- PostProcess ---------" << std::endl;
@@ -195,7 +210,7 @@ TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId)
     return gmesh;
 }
 
-void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh)
+void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::fstream* file)
 {
     TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
     
@@ -203,9 +218,9 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh)
     
     an.SetStructuralMatrix(matskl);
     
-    ///Setting a direct solver
+    //Setting a direct solver
     TPZStepSolver<STATE> step;
-    step.SetDirect(ELDLt);//ELU //ECholesky // ELDLt
+    step.SetDirect(ELDLt);//ELU //ECholesky // ELDLt because it is not positive definite
     
     an.SetSolver(step);
 
@@ -220,9 +235,11 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh)
     an.Solve();
     std::chrono::steady_clock::time_point end2 = std::chrono::steady_clock::now();
     std::cout << "Time Solve = " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - begin2).count() << "[ms]" << std::endl;
+
+    write_directResults(file, begin2, end2);
 }
 
-void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol)
+void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol, std::fstream* file)
 {
     TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
     
@@ -330,10 +347,11 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     //Obtaining the initial solution
     begin = std::chrono::steady_clock::now();
     an.Solve();
-    TPZFMatrix<STATE> sol = an.Solution();
+    //TPZFMatrix<STATE> sol = an.Solution();
     end = std::chrono::steady_clock::now();
     std::cout << "Time for Initial Solver = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
     
+    TPZFMatrix<STATE> sol = an.Solution();
     //Computing the residual (force is not used)
     TPZFMatrix<STATE> aux(nElements,1,0.);
     BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
@@ -347,7 +365,11 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     double norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
     const int size = rhs.Rows();
-    begin = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point begin1 = std::chrono::steady_clock::now();
+
+    //std::vector<double> n_dsol;
+    //std::vector<double> n_rhs;
+
     while (norm_dsol > tol || norm_rhs > tol)
     {
         KG->SolveDirect(dsol,ECholesky);
@@ -370,7 +392,8 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         norm_dsol = sqrt(norm_dsol);
         norm_rhs = sqrt(norm_rhs);
         dsol=rhs;
-        std::cout << "Iteration: " << nit << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
+        //std::cout << "Iteration: " << nit << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
+        //write_Norms(file, norm_dsol, norm_rhs);
 
         if (nit > 200)
         {
@@ -378,13 +401,16 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
             break;
         }
     }
-    
-    end = std::chrono::steady_clock::now();
-    std::cout << "Time Iterative Process = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Number of iterations = " << nit << std::endl;
+
+    std::chrono::steady_clock::time_point end1 = std::chrono::steady_clock::now();
+    std::cout << "Time Iterative Process = " << std::chrono::duration_cast<std::chrono::milliseconds>(end1 - begin1).count() << "[ms]" << std::endl;
 
     //Transfering the solution to the mesh
     an.Solution() = sol;
     an.LoadSolution();
+
+    write_solverResults(file, nit, begin, end, begin1, end1);
 
     TPZFMatrix<REAL>& mesh_sol = cmesh->Solution();
     const int64_t nEquationsFull = mesh_sol.Rows();

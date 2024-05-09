@@ -2,7 +2,7 @@
 #   ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(MY_HEADERS
-  ProblemData.h TPZMixedCompressibleDarcyFlow.h
+  ProblemData.h TPZMixedCompressibleDarcyFlow.h createFile.h dataFile.h
 )
 
 set(MY_SRCS

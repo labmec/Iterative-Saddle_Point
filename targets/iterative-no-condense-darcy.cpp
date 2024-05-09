@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
     #ifdef PZ_LOG
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
-    const int xdiv = 2;
+    const int xdiv = 5;
     const int pOrder = 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     hdivCreator.SetDefaultOrder(pOrder);
     hdivCreator.SetExtraInternalOrder(0);
     hdivCreator.SetShouldCondense(true);
-    // hdivCreator.SetShouldCondense(false);
+    //hdivCreator.SetShouldCondense(false);
     hdivCreator.HybridType() = HybridizationType::ENone;
     // hdivCreator.HybridType() = HybridizationType::EStandard;
 
@@ -134,8 +134,8 @@ int main(int argc, char *argv[])
     an.SetExact(exactSol,solOrder);
 
     bool domHyb = false;
-    // SolveProblemDirect(an, cmesh);
-    SolveProblemIterative(an, cmesh, 0.01, 1.e-9);
+    //SolveProblemDirect(an, cmesh);
+    SolveProblemIterative(an, cmesh, 0.001, 1.e-9);
     clock.stop();
 
     std::cout << "--------- PostProcess ---------" << std::endl;
@@ -276,6 +276,11 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
     double norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
     const int size = rhs.Rows();
+    begin = std::chrono::steady_clock::now();
+
+    //Norms n_dsol;
+    //Norms n_rhs;
+
     while (norm_dsol > tol || norm_rhs > tol)
     {
         K_it->SolveDirect(dsol,ELDLt);
@@ -293,7 +298,9 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
         norm_dsol = sqrt(norm_dsol);
         norm_rhs = sqrt(norm_rhs);
         dsol=rhs;
-        std::cout << "Iteration: " << nit << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
+        //std::cout << "Iteration: " << nit << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
+        //n_dsol.add(norm_dsol);
+        //n_rhs.add(norm_rhs);
 
         if (nit > 50)
         {
@@ -301,7 +308,19 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alp
             break;
         }
     }
-    
+    std::cout << "Number of iterations = " << nit << std::endl;
+    //std::cout << "norms_dsol = ";
+    //n_dsol.print();
+    //std::cout << "relation_norms_dsol = ";
+    //n_dsol.relation();
+    //std::cout << "norms_rhs = ";
+    //n_rhs.print();
+    //std::cout << "relation_norms_rhs = ";
+    //n_rhs.relation();
+
+    end = std::chrono::steady_clock::now();
+    std::cout << "Time Iterative Process = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
     //Transfering the solution to the mesh
     an.Solution() = sol;
     an.LoadSolution();
