@@ -35,7 +35,8 @@
 #include <TPZVTKGeoMesh.h>
 #include "ProblemData.h"
 #include <TPZSYSMPMatrix.h>
-#include <TPZSYSMPPardiso.h>
+#include "pzskylstrmatrix.h"
+// #include <TPZSYSMPPardiso.h>
 
 const int global_nthread = 0;
 enum EMatid  {ENone, EDomain, EBoundary, EPont, EWrap, EIntface, EPressureHyb};
@@ -224,7 +225,8 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh)
 
 void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol)
 {
-    TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
+    TPZSkylineStructMatrix<STATE> matskl(cmesh);
+    // TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
     
     matskl.SetNumThreads(global_nthread);
     

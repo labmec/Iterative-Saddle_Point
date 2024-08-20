@@ -35,8 +35,10 @@
 #include <TPZVTKGeoMesh.h>
 #include "ProblemData.h"
 #include <TPZYSMPMatrix.h>
-#include <TPZYSMPPardiso.h>
-#include <TPZSYSMPPardiso.h>
+//#include <TPZYSMPPardiso.h>
+// #include <TPZSYSMPPardiso.h>
+#include "pzskylstrmatrix.h"
+
 #include "TPZMixedCompressibleDarcyFlow.h"
 #include <pzcondensedcompel.h>
 #include <pzelchdiv.h>
@@ -88,8 +90,9 @@ int main(int argc, char *argv[])
     const int pOrder = argc > 2 ? atoi(argv[2]) : 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     bool useIterative = argc > 3 ? atoi(argv[3]) : 0;
+    useIterative = true;
     REAL alpha = argc > 4 ? atof(argv[4]) : 0.001;
-
+    alpha = 0.1;
     std::string output_name = "ndiv-" + std::to_string(xdiv) + "-p-" + std::to_string(pOrder) + "-iter-" + std::to_string(useIterative);
     if (argc > 4)
         output_name += "-alpha-" + std::string(argv[4]) + ".txt";
@@ -158,7 +161,8 @@ TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId)
 
 void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream &outfile)
 {
-    TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
+    TPZSkylineStructMatrix<STATE> matskl(cmesh); //caso simetrico
+    // TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
     
     matskl.SetNumThreads(global_nthread);
     
@@ -189,7 +193,8 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream
 
 void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha, double tol, std::ofstream &outfile)
 {
-    TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
+    TPZSkylineStructMatrix<STATE> matskl(cmesh); //caso simetrico
+    // TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
     
     matskl.SetNumThreads(global_nthread);
     
@@ -242,6 +247,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
     TPZVec<int64_t> iBT(nElements+1,0);
     TPZVec<int64_t> jBT(nFacetConnects,0);
     TPZVec<STATE> valBT(nFacetConnects,0.);
+    TPZVec<STATE> elArea(nElements,0.);
 
     int64_t row = 0;
     int count = 0;
@@ -281,10 +287,28 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
             jBT[count] = col;
             count++;
         }
+        const TPZIntPoints &intpoints = cel->GetIntegrationRule();
+        int geldim = gel->Dimension();
+        TPZManVector<REAL,3> xp(3,0.);
+        int np = intpoints.NPoints();
+        for (int ip = 0; ip < np; ip++)
+        {
+            TPZManVector<REAL,3> xi(geldim,0.);
+            REAL weight;
+            intpoints.Point(ip,xi,weight);
+            gel->X(xi,xp);
+            REAL detjac;
+            TPZFMatrix<REAL> jac(geldim,geldim),jacinv(geldim,geldim);
+            TPZFMatrix<REAL> axes(geldim,3);
+            REAL jacdet;
+            gel->Jacobian(xp,jac, axes, jacdet, jacinv);
+            elArea[row] += weight * jacdet;
+        }
         row++;
     }
 
-    TPZFYsmpMatrixPardiso<STATE> BT(nElements,nFacetEqs);
+    std::cout << "Element area " << elArea << std::endl;
+    TPZFYsmpMatrix<STATE> BT(nElements,nFacetEqs);
     BT.SetData(iBT,jBT,valBT);
     
     //Gettig the Global stiffness matrix from solver
@@ -308,12 +332,20 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
     //Computing the residual (force is not used)
     TPZFMatrix<STATE> aux(nElements,1,0.);
     BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
+    for(int64_t i = 0; i < nElements; i++)
+    {
+        aux(i,0) /= elArea[i];
+    }
     BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = -Transpose(BT) * aux / alpha = -Transpose(BT) * BT * sol / alpha
     dsol = rhs;
 
     //Computing initial pressure (force is not used)
     TPZFMatrix<STATE> pressure(nElements,1,0.);
     BT.MultAdd(sol, force, pressure, 1.0/alpha, 0.0); //pressure = BT * sol / alpha
+    for(int64_t i = 0; i < nElements; i++)
+    {
+        pressure(i,0) /= elArea[i];
+    }
     
     double norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
@@ -329,10 +361,20 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         sol += dsol;
         //Updating the residual (force is not used)
         BT.MultAdd(sol, force, aux, 1.0, 0.0); //aux = BT * sol
+        for(int64_t i = 0; i < nElements; i++)
+        {
+            aux(i,0) /= elArea[i];
+        }
+
         BT.MultAdd(aux, force, rhs, -1.0/alpha, 0.0, 1); //rhs = Transpose(BT) * aux = Transpose(BT) * BT * sol
         //Updating pressure (force is not used)
         TPZFMatrix<STATE> dp(nElements,1,0.);
         BT.MultAdd(sol, force, dp, 1.0/alpha, 0.0); //dp = BT * sol / alpha
+        for(int64_t i = 0; i < nElements; i++)
+        {
+            dp(i,0) /= elArea[i];
+        }
+
         pressure += dp;
         nit++;
         norm_dsol = 0.0;

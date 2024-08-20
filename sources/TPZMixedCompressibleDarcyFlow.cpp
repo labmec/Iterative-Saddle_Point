@@ -229,7 +229,8 @@ void TPZMixedCompressibleDarcyFlow::Contribute(const TPZVec<TPZMaterialDataT<STA
 
     //contribution matrix -alpha*I that adds a slightly compressible term to the flow equation
     for (int ip = 0; ip < phrp; ip++) {
-        ek(phrq+ip, phrq+ip) = -fAlpha;
+        // ek(phrq+ip, phrq+ip) = -fAlpha;
+        ek(phrq+ip, phrq+ip) += -fAlpha*weight;
     }
 
     // source term related to the pressure equation
