@@ -2,11 +2,11 @@
 #   ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(MY_HEADERS
-  ProblemData.h TPZMixedCompressibleDarcyFlow.h
+  ProblemData.h TPZMixedCompressibleDarcyFlow.h TPZMixedCompressibleStokes.h TPZInterfaceStokes.h
 )
 
 set(MY_SRCS
-  ProblemData.cpp json.hpp TPZMixedCompressibleDarcyFlow.cpp
+  ProblemData.cpp json.hpp TPZMixedCompressibleDarcyFlow.cpp TPZMixedCompressibleStokes.cpp TPZInterfaceStokes.cpp
 )
 
 # let us create a config file with the directory containing the meshes
