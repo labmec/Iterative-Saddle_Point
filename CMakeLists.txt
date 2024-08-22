@@ -11,6 +11,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Finding the pz package
 find_package(NeoPZ REQUIRED HINTS ../NeoPZ_install ../neopz_install)
 
+option(USING_MKL OFF)
+if(USING_MKL)
+    add_compile_definitions(USING_MKL)
+endif()
+
 # creating a common library for all the targets in this repo
 add_library(libproject SHARED "")
 target_link_libraries(libproject PUBLIC NeoPZ::pz)
