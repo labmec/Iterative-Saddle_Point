@@ -5,25 +5,26 @@
 #include <fstream>
 #include <ostream>
 #include <iostream>
-#include "TPZMixedCompressibleStokes.h"
+
+#include "TPZHybridStokes.h"
 
 #ifdef PZ_LOG
 static TPZLogger logger("pz.stokesmaterial");
 #endif
 
-TPZMixedCompressibleStokes::TPZMixedCompressibleStokes() : TBase()
+TPZHybridStokes::TPZHybridStokes() : TBase()
 {
 }
 
-TPZMixedCompressibleStokes::TPZMixedCompressibleStokes(int matID, int dimension, REAL viscosity, REAL alpha) : TBase(matID), fDimension(dimension), fViscosity(viscosity), fAlpha(alpha)
+TPZHybridStokes::TPZHybridStokes(int matID, int dimension, REAL viscosity) : TBase(matID), fDimension(dimension), fViscosity(viscosity)
 {
 }
 
-TPZMixedCompressibleStokes::~TPZMixedCompressibleStokes()
+TPZHybridStokes::~TPZHybridStokes()
 {
 }
 
-void TPZMixedCompressibleStokes::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek, TPZFMatrix<STATE> &ef)
+void TPZHybridStokes::Contribute(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek, TPZFMatrix<STATE> &ef)
 {
     int64_t nShapeV = datavec[EVindex].fVecShapeIndex.NElements(); // number of velocity Hdiv shape functions
     TPZFNMatrix<150, REAL> PhiV(fDimension, nShapeV, 0.0);
@@ -89,12 +90,6 @@ void TPZMixedCompressibleStokes::Contribute(const TPZVec<TPZMaterialDataT<STATE>
     // Divergence Matrix BT contribution
     ek.AddContribution(nShapeV, 0, PhiP, false, divPhiV, true, factor);
 
-    // Compressibility matrix C contribution
-    TPZFNMatrix<150, REAL> I(nShapeP,nShapeP,0.0);
-    I.Identity();
-    factor = -1.0 * fAlpha * weight;
-    ek.AddContribution(nShapeP, nShapeP, I, false, I, false, weight);
-
     if (datavec.size() > 2)
     {
         TPZFMatrix<REAL> &phiG = datavec[EGindex].phi;
@@ -125,7 +120,7 @@ void TPZMixedCompressibleStokes::Contribute(const TPZVec<TPZMaterialDataT<STATE>
 #endif
 }
 
-void TPZMixedCompressibleStokes::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek, TPZFMatrix<STATE> &ef, TPZBndCondT<STATE> &bc)
+void TPZHybridStokes::ContributeBC(const TPZVec<TPZMaterialDataT<STATE>> &datavec, REAL weight, TPZFMatrix<STATE> &ek, TPZFMatrix<STATE> &ef, TPZBndCondT<STATE> &bc)
 {
 
     TPZFNMatrix<150, REAL> PhiV = datavec[EVindex].phi;
@@ -310,7 +305,7 @@ void TPZMixedCompressibleStokes::ContributeBC(const TPZVec<TPZMaterialDataT<STAT
     }
 }
 
-int TPZMixedCompressibleStokes::VariableIndex(const std::string &name) const
+int TPZHybridStokes::VariableIndex(const std::string &name) const
 {
 
     if (!strcmp("Pressure", name.c_str()))
@@ -343,7 +338,7 @@ int TPZMixedCompressibleStokes::VariableIndex(const std::string &name) const
     return 0;
 }
 
-int TPZMixedCompressibleStokes::NSolutionVariables(int var) const
+int TPZHybridStokes::NSolutionVariables(int var) const
 {
 
     int aux;
@@ -375,7 +370,7 @@ int TPZMixedCompressibleStokes::NSolutionVariables(int var) const
     return aux;
 }
 
-void TPZMixedCompressibleStokes::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec, int var, TPZVec<STATE> &Solout)
+void TPZHybridStokes::Solution(const TPZVec<TPZMaterialDataT<STATE>> &datavec, int var, TPZVec<STATE> &Solout)
 {
 
     const int n = fDimension * (fDimension + 1) / 2;
@@ -508,7 +503,7 @@ void TPZMixedCompressibleStokes::Solution(const TPZVec<TPZMaterialDataT<STATE>> 
     }
 }
 
-void TPZMixedCompressibleStokes::FillDataRequirements(TPZVec<TPZMaterialDataT<STATE>> &datavec) const
+void TPZHybridStokes::FillDataRequirements(TPZVec<TPZMaterialDataT<STATE>> &datavec) const
 {
     int64_t ndata = datavec.size();
     for (int idata = 0; idata < ndata; idata++)
@@ -521,7 +516,7 @@ void TPZMixedCompressibleStokes::FillDataRequirements(TPZVec<TPZMaterialDataT<ST
     datavec[0].fNeedsDeformedDirectionsFad = true;
 }
 
-void TPZMixedCompressibleStokes::FillBoundaryConditionDataRequirements(int type, TPZVec<TPZMaterialDataT<STATE>> &datavec) const
+void TPZHybridStokes::FillBoundaryConditionDataRequirements(int type, TPZVec<TPZMaterialDataT<STATE>> &datavec) const
 {
     datavec[EVindex].fNeedsSol = false;
     datavec[EPindex].fNeedsSol = false;
@@ -529,7 +524,7 @@ void TPZMixedCompressibleStokes::FillBoundaryConditionDataRequirements(int type,
     datavec[EPindex].fNeedsNormal = true;
 }
 
-void TPZMixedCompressibleStokes::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZVec<REAL> &errors)
+void TPZHybridStokes::Errors(const TPZVec<TPZMaterialDataT<STATE>> &data, TPZVec<REAL> &errors)
 {
     // 0: L2 p, 1: L2 p_ex, 2: L2 u, 3: L2 u_ex, 4: L2 divu, 5: L2 divu, 6: L2 sigma, 7: L2 sigma_ex
 
@@ -628,7 +623,7 @@ void TPZMixedCompressibleStokes::Errors(const TPZVec<TPZMaterialDataT<STATE>> &d
     }
 }
 
-void TPZMixedCompressibleStokes::StressTensor(const TPZFNMatrix<10, STATE> &gradU, TPZFNMatrix<6, REAL> &sigma, REAL pressure)
+void TPZHybridStokes::StressTensor(const TPZFNMatrix<10, STATE> &gradU, TPZFNMatrix<6, REAL> &sigma, REAL pressure)
 {
 
     const int n = fDimension * (fDimension + 1) / 2;
@@ -646,7 +641,7 @@ void TPZMixedCompressibleStokes::StressTensor(const TPZFNMatrix<10, STATE> &grad
     }
 }
 
-void TPZMixedCompressibleStokes::DeviatoricStressTensor(const TPZFNMatrix<10, STATE> &gradU, TPZFNMatrix<6, REAL> &sigma)
+void TPZHybridStokes::DeviatoricStressTensor(const TPZFNMatrix<10, STATE> &gradU, TPZFNMatrix<6, REAL> &sigma)
 {
 
     const int n = fDimension * (fDimension + 1) / 2;
@@ -659,7 +654,7 @@ void TPZMixedCompressibleStokes::DeviatoricStressTensor(const TPZFNMatrix<10, ST
     D.Multiply(strain, sigma);
 }
 
-void TPZMixedCompressibleStokes::StrainTensor(const TPZFNMatrix<10, STATE> &gradU, TPZFNMatrix<6, REAL> &epsilon)
+void TPZHybridStokes::StrainTensor(const TPZFNMatrix<10, STATE> &gradU, TPZFNMatrix<6, REAL> &epsilon)
 {
 
     const int n = fDimension * (fDimension + 1) / 2;
@@ -677,7 +672,7 @@ void TPZMixedCompressibleStokes::StrainTensor(const TPZFNMatrix<10, STATE> &grad
     }
 }
 
-void TPZMixedCompressibleStokes::ViscosityTensor(TPZFNMatrix<36, REAL> &D)
+void TPZHybridStokes::ViscosityTensor(TPZFNMatrix<36, REAL> &D)
 {
     int n = fDimension * (fDimension + 1) / 2;
 
@@ -687,7 +682,7 @@ void TPZMixedCompressibleStokes::ViscosityTensor(TPZFNMatrix<36, REAL> &D)
     }
 }
 
-void TPZMixedCompressibleStokes::FromVoigt(const TPZFNMatrix<6, STATE> &sigmaVoigt, TPZFNMatrix<9, STATE> &sigma) const
+void TPZHybridStokes::FromVoigt(const TPZFNMatrix<6, STATE> &sigmaVoigt, TPZFNMatrix<9, STATE> &sigma) const
 {
     int cont = fDimension - 1;
 

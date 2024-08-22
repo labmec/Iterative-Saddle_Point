@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include<fstream>
-#include "json.hpp"
+#include <json.hpp>
 #include <pzerror.h>
 
 #include "ProblemData.h"
@@ -12,7 +12,9 @@ using namespace std;
 ProblemData::ProblemData(){
     fBcNormalVec.clear(); fBcNormalVec.reserve(10);
     fBcTangentialVec.clear(); fBcTangentialVec.reserve(10);
+    fBcAxisymmetryVec.clear(); fBcAxisymmetryVec.reserve(10);
     fDomain.clear(); fDomain.reserve(10);
+    fAxisymmetryDomain.clear(); fAxisymmetryDomain.reserve(10);
 }
 
 // deconstructor
@@ -23,53 +25,58 @@ ProblemData::~ProblemData(){
 // readjson function. takes a json function as parameter and completes the required simulation data
 void ProblemData::ReadJson(std::string file){
     std::ifstream filejson(file);
+
     json input = json::parse(filejson,nullptr,true,true); // to ignore comments in json file
     
     // checking infos in the json file
-    if(input.find("MeshName") == input.end()) DebugStop();
     if(input.find("HdivType")==input.end()) DebugStop();
-    if(input.find("DisppOrder") == input.end()) DebugStop();
+    if(input.find("isAxisymmetric")==input.end()) DebugStop();
+    if(input.find("VelpOrder") == input.end()) DebugStop();
+    if(input.find("TracpOrder") == input.end()) DebugStop();
     if(input.find("Dim") == input.end()) DebugStop();
     if(input.find("Resolution")==input.end()) DebugStop();
     if(input.find("StaticCondensation") == input.end()) DebugStop();
     if(input.find("Domain") == input.end()) DebugStop();
-//    if(input.find("NormalBoundary") == input.end()) DebugStop();
-//    if(input.find("TangentialBoundary") == input.end()) DebugStop();
+    if(input.find("NormalBoundary") == input.end()) DebugStop();
+    if(input.find("TangentialBoundary") == input.end()) DebugStop();
+    if(input.find("AxisymmetryDomain") == input.end()) DebugStop();
+    if(input.find("AxisymmetryBoundary") == input.end()) DebugStop();
+    if(input.find("InterfaceID") == input.end()) DebugStop();
+    if(input.find("LambdaID")==input.end()) DebugStop();
+    if(input.find("AxiLambdaID") == input.end()) DebugStop();
+    if(input.find("AxiInterfaceID")==input.end()) DebugStop();
+    if(input.find("FluxInterfaceID") == input.end()) DebugStop();
+    if(input.find("HasAnalyticSolution") == input.end()) DebugStop();
         
     // accessing and assigning values
-    fMeshName = input["MeshName"];    
-   
-    fHdivtype = input["HdivType"]; // if hdivtype == -1, then it is H1
+    fHdivtype = input["HdivType"];
     
-    fDisppOrder = input["DisppOrder"];
-    
-    if(input.find("LambdapOrder") != input.end()){
-        fLambdapOrder = input["LambdapOrder"];
-    }
+    fAxisymmetric = input["isAxisymmetric"];
 
-    if(input.find("CreateMsh") != input.end())
-        fMshFile = input["CreateMsh"];
+    fVelpOrder = input["VelpOrder"];
+    
+    fTracpOrder = input["TracpOrder"];
     
     fDim = input["Dim"];
     
     fResolution = input["Resolution"];
     
     fCondensedElement = input["StaticCondensation"];
-
-    if(input.find("InternalPressure") != input.end())
-        fInternalPressure = input["InternalPressure"];
     
+    fhasAnalyticSolution = input["HasAnalyticSolution"];
+    
+    if (input.find("ObstructionID") != input.end())
+        fObstructionID = input["ObstructionID"];
+
     DomainData domaindata;
     for(auto& domainjson : input["Domain"]){
         if(domainjson.find("name") == domainjson.end()) DebugStop();
         if(domainjson.find("matID") == domainjson.end()) DebugStop();
-        if(domainjson.find("E") == domainjson.end()) DebugStop();
-        if(domainjson.find("nu") == domainjson.end()) DebugStop();
+        if(domainjson.find("viscosity") == domainjson.end()) DebugStop();
         
         domaindata.name = domainjson["name"];
         domaindata.matID = domainjson["matID"];
-        domaindata.E = domainjson["E"];
-        domaindata.nu = domainjson["nu"];
+        domaindata.viscosity = domainjson["viscosity"];
         
         fDomain.push_back(domaindata);
     }
@@ -104,15 +111,50 @@ void ProblemData::ReadJson(std::string file){
         
         fBcTangentialVec.push_back(bcTangentialdata);
     }
-    
-    if(input.find("InterfaceID") != input.end()) {
-        fInterfaceID = input["InterfaceID"];
-    }
-    if(input.find("LambdaID") != input.end()) {
-        fLambdaID = input["LambdaID"];
-    }
 
-    fCondensedElement? fMeshVector.resize(4) : fMeshVector.resize(2);
+    if (fAxisymmetric)
+    {
+        AxisymmetryDomainData axidomaindata;
+        for(auto& axidomainjson : input["AxisymmetryDomain"])
+        {
+            if(axidomainjson.find("name") == axidomainjson.end()) DebugStop();
+            if(axidomainjson.find("matID") == axidomainjson.end()) DebugStop();
+            if(axidomainjson.find("viscosity") == axidomainjson.end()) DebugStop();
+            if(axidomainjson.find("radius") == axidomainjson.end()) DebugStop();
+            
+            axidomaindata.name = axidomainjson["name"];
+            axidomaindata.matID = axidomainjson["matID"];
+            axidomaindata.viscosity = axidomainjson["viscosity"];
+            axidomaindata.radius = axidomainjson["radius"];
+            
+            fAxisymmetryDomain.push_back(axidomaindata);
+        }
+
+        BcData bcAxisymmetrydata;
+        for(auto& bcjson : input["AxisymmetryBoundary"])
+        {
+            if(bcjson.find("name") == bcjson.end()) DebugStop();
+            if(bcjson.find("type") == bcjson.end()) DebugStop();
+            if(bcjson.find("value") == bcjson.end()) DebugStop();
+            if(bcjson.find("matID") == bcjson.end()) DebugStop();
+
+            bcAxisymmetrydata.name = bcjson["name"];
+            bcAxisymmetrydata.type = bcjson["type"];
+            bcAxisymmetrydata.value[0] = bcjson["value"];
+            bcAxisymmetrydata.matID = bcjson["matID"];
+            
+            fBcAxisymmetryVec.push_back(bcAxisymmetrydata);
+        }
+    }
+    
+    fInterfaceID = input["InterfaceID"];
+    fLambdaID = input["LambdaID"];
+    fAxiLambdaID = input["AxiLambdaID"];
+    fAxiInterfaceID = input["AxiInterfaceID"];
+    fFluxInterfaceID = input["FluxInterfaceID"];
+    
+    if (fCondensedElement && fHdivtype != EConstant) fMeshVector.resize(4);
+    else fMeshVector.resize(2);
 }
 
 void ProblemData::Print(std::ostream& out){
@@ -120,10 +162,12 @@ void ProblemData::Print(std::ostream& out){
     out << "Mesh Name: " << fMeshName << std::endl << std::endl;
     
     out << "Hdiv Type: " << fHdivtype << std::endl << std::endl;
+
+    out << "IsAxisymmetric: " << fAxisymmetric << std::endl << std::endl;
     
-    out << "Velocity pOrder: " << fDisppOrder << std::endl << std::endl;
+    out << "Velocity pOrder: " << fVelpOrder << std::endl << std::endl;
     
-    out << "Traction pOrder: " << fLambdapOrder << std::endl << std::endl;
+    out << "Traction pOrder: " << fTracpOrder << std::endl << std::endl;
     
     out << "Dimension: " << fDim << std::endl << std::endl;
     
@@ -131,15 +175,12 @@ void ProblemData::Print(std::ostream& out){
     
     out << "Static Condensation: " << fCondensedElement << std::endl << std::endl;
     
-    out << "Internal Pressure: " << fInternalPressure << std::endl << std::endl;
-    
     out << "Domain: " << std::endl;
     
     for(const auto& domaindata : fDomain){
         out << "  Domain Name: " << domaindata.name << std::endl;
         out << "  Domain MatID: " << domaindata.matID << std::endl;
-        out << "  Domain E: " << domaindata.E << std::endl;
-        out << "  Domain Poisson: " << domaindata.nu << std::endl << std::endl;
+        out << "  Domain Viscosity: " << domaindata.viscosity << std::endl << std::endl;
     }
     
     out << "Normal Boundary Conditions: " << std::endl;
@@ -159,8 +200,19 @@ void ProblemData::Print(std::ostream& out){
         out << "  BC Type: " << bcdata.type << std::endl;
         out << "  BC Value: " << bcdata.value << std::endl << std::endl;
     }
+
+    out << "Axisymmetric Domain at r=0: " << std::endl;
     
-    for(const auto& bcdata : fBcTangentialVec){
+    for(const auto& domaindata : fAxisymmetryDomain){
+        out << "  Axisymmetric Domain Name: " << domaindata.name << std::endl;
+        out << "  Axisymmetric Domain MatID: " << domaindata.matID << std::endl;
+        out << "  Axisymmetric Domain Viscosity: " << domaindata.viscosity << std::endl << std::endl;
+        out << "  Axisymmetric Domain radius: " << domaindata.radius << std::endl << std::endl;
+    }
+
+    out << "Axisymmetric Boundary Conditions at r=0: " << std::endl;
+    
+    for(const auto& bcdata : fBcAxisymmetryVec){
         out << "  BC Name: " << bcdata.name << std::endl;
         out << "  BC MatID: " << bcdata.matID << std::endl;
         out << "  BC Type: " << bcdata.type << std::endl;
@@ -171,3 +223,4 @@ void ProblemData::Print(std::ostream& out){
     
     out << "Lambda Elements ID: " << fLambdaID << std::endl << std::endl;
 }
+

@@ -8,10 +8,10 @@
 #include <TPZMatErrorCombinedSpaces.h>
 #include <math.h>
 
-#ifndef TPZMIXEDCOMPRESSIBLESTOKES
-#define TPZMIXEDCOMPRESSIBLESTOKES
+#ifndef TPZHYBRIDSTOKES
+#define TPZHYBRIDSTOKES
 
-class TPZMixedCompressibleStokes : public TPZMatBase<STATE, TPZMatCombinedSpacesT<STATE>, TPZMatErrorCombinedSpaces<STATE>> {
+class TPZHybridStokes : public TPZMatBase<STATE, TPZMatCombinedSpacesT<STATE>, TPZMatErrorCombinedSpaces<STATE>> {
     
     using TBase = TPZMatBase<STATE, TPZMatCombinedSpacesT<STATE>, TPZMatErrorCombinedSpaces<STATE>>;
     
@@ -24,9 +24,6 @@ protected:
     
     /// fluid viscosity
     REAL fViscosity;
-
-    /// compressibility parameter
-    REAL fAlpha;
     
     enum SpaceIndex {EVindex, EPindex, EGindex, EPMindex};
 
@@ -36,13 +33,13 @@ protected:
     
 public:
     /// Empty Constructor
-    TPZMixedCompressibleStokes();
+    TPZHybridStokes();
 
     /// Creates a material object and inserts it in the vector of material pointers of the mesh
-    TPZMixedCompressibleStokes(int matID, int dimension, REAL viscosity, REAL alpha);
+    TPZHybridStokes(int matID, int dimension, REAL viscosity);
     
     /// Destructor
-    ~TPZMixedCompressibleStokes();
+    ~TPZHybridStokes();
     
     /// returns the solution associated with the var index based on the finite element approximation
     void Solution(const TPZVec<TPZMaterialDataT<STATE>>&datavec, int var, TPZVec<STATE>& Solout) override;
