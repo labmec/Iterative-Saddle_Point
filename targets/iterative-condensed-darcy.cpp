@@ -25,7 +25,6 @@
 #include "pzbuildmultiphysicsmesh.h"
 #include "TPZHDivApproxCreator.h"
 #include "DarcyFlow/TPZMixedDarcyFlow.h"
-#include <TPZSSpStructMatrix.h> //symmetric sparse matrix storage
 #include <pzstepsolver.h> //for TPZStepSolver
 #include "pzblockdiag.h"
 #include "pzbdstrmatrix.h"
@@ -35,8 +34,11 @@
 #include <TPZVTKGeoMesh.h>
 #include "ProblemData.h"
 #include <TPZYSMPMatrix.h>
-//#include <TPZYSMPPardiso.h>
-// #include <TPZSYSMPPardiso.h>
+#ifdef USING_MKL
+    #include <TPZYSMPPardiso.h>
+    #include <TPZSYSMPPardiso.h>
+    #include <TPZSSpStructMatrix.h> //symmetric sparse matrix storage
+#endif
 #include "pzskylstrmatrix.h"
 
 #include "TPZMixedCompressibleDarcyFlow.h"
@@ -193,12 +195,15 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream
 
 void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha, double tol, std::ofstream &outfile)
 {
-    TPZSkylineStructMatrix<STATE> matskl(cmesh); //caso simetrico
-    // TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
+#ifdef USING_MKL
+    TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> strmat(cmesh);
+#else
+    TPZSkylineStructMatrix<STATE> strmat(cmesh);
+#endif
+
+    strmat.SetNumThreads(global_nthread);
     
-    matskl.SetNumThreads(global_nthread);
-    
-    an.SetStructuralMatrix(matskl);
+    an.SetStructuralMatrix(strmat);
     
     ///Setting a direct solver
     TPZStepSolver<STATE> step;
