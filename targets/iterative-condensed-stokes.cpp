@@ -46,7 +46,7 @@
 #include "TPZHybridCompressibleStokes.h"
 #include "TPZInterfaceStokes.h"
 
-const int global_nthread = 0;
+const int global_nthread = 8;
 
 TPZGeoMesh *CreateGMesh(ProblemData *inputData);
 
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
     std::string filename = "Poiseuille";
     input.ReadJson(std::string(MESHES_DIR) + "/" + filename + ".json");
 
-    const int ndiv = argc > 1 ? atoi(argv[1]) : 5;
+    const int ndiv = argc > 1 ? atoi(argv[1]) : 1;
     input.SetMeshName(std::string(MESHES_DIR) + "/" + filename + std::to_string(ndiv) + ".msh");
     if (argc > 2) //set p order at runtime
     {
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
     TStokesAnalytic *exactSol = new TStokesAnalytic();
     exactSol->fvisco = input.DomainVec()[0].viscosity;
     exactSol->fvelocity = 1.;
-    exactSol->fconstPressure = 1.;
+    exactSol->fconstPressure = -0.5;
     exactSol->fDimension = input.Dim();
     exactSol->fExactSol = TStokesAnalytic::EPoisFlow;
 
@@ -906,12 +906,14 @@ void CondenseElements(ProblemData *inputData, TPZMultiphysicsCompMesh *cmesh_m, 
 
 void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream &outfile)
 {
-    TPZSkylineStructMatrix<STATE> matskl(cmesh); // caso simetrico
-    // TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);
+    #ifdef USING_MKL
+    TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> strmat(cmesh);
+#else
+    TPZSkylineStructMatrix<STATE> strmat(cmesh);
+#endif
+    strmat.SetNumThreads(global_nthread);
 
-    matskl.SetNumThreads(global_nthread);
-
-    an.SetStructuralMatrix(matskl);
+    an.SetStructuralMatrix(strmat);
 
     /// Setting a direct solver
     TPZStepSolver<STATE> step;
@@ -1060,13 +1062,13 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         row++;
     }
 
-    std::cout << "Element area " << elArea << std::endl;
-    TPZFYsmpMatrix<STATE> BT(nElements, nFacetEqs);
-    BT.SetData(iBT, jBT, valBT);
-
     // Gettig the Global stiffness matrix from solver
     auto KG = an.MatrixSolver<STATE>().Matrix();
     KG->SetDefPositive(true);
+    int64_t neq = KG->Rows();
+    TPZFYsmpMatrix<STATE> BT(nElements, neq);
+    BT.SetData(iBT, jBT, valBT);
+
 
     TPZFMatrix<STATE> force = an.Rhs();
     TPZFMatrix<STATE> rhs(cmesh->NEquations(), 1, 0.);
@@ -1109,7 +1111,6 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         KG->SolveDirect(dsol, ECholesky);
         end = std::chrono::steady_clock::now();
         REAL iterativetime = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-        std::cout << "Time Iterative Process = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
         timesolve += iterativetime;
         sol += dsol;
         // Updating the residual (force is not used)
@@ -1159,16 +1160,25 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
     an.LoadSolution();
 
     TPZFMatrix<REAL> &mesh_sol = cmesh->Solution();
+    const int64_t nconnectHDiv = cmesh_u->NConnects();
     const int64_t nEquationsFull = mesh_sol.Rows();
-    for (const TPZConnect &con : cmesh->ConnectVec())
+    for (int64_t ic = nconnectHDiv; ic < nconnectHDiv+nElements; ic++)
     {
-        if (con.LagrangeMultiplier() != 1)
-            continue; // only pressure connect
+        TPZConnect &con = cmesh->ConnectVec()[ic];
         int64_t seq = con.SequenceNumber();
         int64_t pos = cmesh->Block().Position(seq);
-        int64_t posloc = pos - (nEquationsFull - nElements); // position in the local pressure solution
-        mesh_sol(pos, 0) = pressure(posloc, 0);
+        mesh_sol(pos, 0) = pressure(ic-nconnectHDiv, 0);
     }
+    // for (const TPZConnect &con : cmesh->ConnectVec())
+    // {
+    //     if (con.LagrangeMultiplier() != 2)
+    //         continue; // only pressure connect
+    //     int64_t 
+    //     int64_t seq = con.SequenceNumber();
+    //     int64_t pos = cmesh->Block().Position(seq);
+    //     int64_t posloc = pos - (nEquationsFull - nElements); // position in the local pressure solution
+    //     mesh_sol(pos, 0) = pressure(posloc, 0);
+    // }
     cmesh->TransferMultiphysicsSolution();
 }
 
@@ -1226,8 +1236,8 @@ void IterativeSolver(TPZGeoMesh* gmesh, ProblemData* inputData, REAL alpha, TPZA
 
     SolveProblemIterative(an, cmesh_m, alpha, 1.e-9, outfile);
 
-    // std::cout << "--------- PostProcess ---------" << std::endl;
-    // PrintResults(an, cmesh, 0);
+    std::cout << "--------- PostProcess ---------" << std::endl;
+    PrintResults(an, cmesh_m, inputData->Resolution());
 }
 
 void DirectSolver(TPZGeoMesh* gmesh, ProblemData* inputData, TPZAnalyticSolution* sol, std::ofstream &outfile)
@@ -1262,6 +1272,6 @@ void DirectSolver(TPZGeoMesh* gmesh, ProblemData* inputData, TPZAnalyticSolution
 
     SolveProblemDirect(an, cmesh_m, outfile);
 
-    // std::cout << "--------- PostProcess ---------" << std::endl;
-    // PrintResults(an, cmesh, 0);
+    std::cout << "--------- PostProcess ---------" << std::endl;
+    PrintResults(an, cmesh_m, inputData->Resolution());
 }

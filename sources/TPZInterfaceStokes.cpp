@@ -124,9 +124,10 @@ void TPZInterfaceStokes::FillDataRequirementsInterface(TPZMaterialDataT<STATE> &
 
     datavec_left[0].fNeedsNormal = false;
     datavec_left[0].fNeedsSol = false;
-    datavec_left[0].fNeedsDeformedDirectionsFad = false;
+    datavec_left[0].fNeedsDeformedDirectionsFad = true;
     datavec_right[1].fNeedsNormal = false;
     datavec_right[1].fNeedsSol = false;
+    datavec_right[1].fNeedsDeformedDirectionsFad = false;
 }
 
 void TPZInterfaceStokes::SolutionInterface(const TPZMaterialDataT<STATE> &data,

@@ -1,9 +1,9 @@
 {
     "HdivType": 1,
-    "VelpOrder": 1,
-    "TracpOrder": 0,
+    "VelpOrder": 2,
+    "TracpOrder": 1,
     "Dim": 3,
-    "Resolution": 0,
+    "Resolution": 1,
     "StaticCondensation": true,
     "isAxisymmetric": 0,
     "HasAnalyticSolution": true,
@@ -16,27 +16,31 @@
     ],
     "NormalBoundary": [
         {
-            "name": "NNormStress",
+            "name": "sigmaN",
             "type": 2,
             "value": 0,
             "matID": 2
         },
         {
-            "name": "PNormStress",
-            "type": 2,
-            "value": 5,
-            "matID": 3
-        },
-        {
-            "name": "NoPenetration",
+            "name": "velN",
             "type": 0,
             "value": 0,
-            "matID": 4
+            "matID": 3
         }
     ],
     "TangentialBoundary": [
         {
-            "name": "NoSlipCondition",
+            "name": "sigmaT",
+            "type": 3,
+            "value": [
+                0,
+                0,
+                0
+            ],
+            "matID": 4
+        },
+        {
+            "name": "velT",
             "type": 1,
             "value": [
                 0,
@@ -44,16 +48,6 @@
                 0
             ],
             "matID": 5
-        },
-        {
-            "name": "SlipCondition",
-            "type": 3,
-            "value": [
-                0,
-                0,
-                0
-            ],
-            "matID": 6
         }
     ],
     "AxisymmetryDomain": [],
