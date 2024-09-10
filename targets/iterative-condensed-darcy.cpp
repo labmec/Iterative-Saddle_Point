@@ -56,7 +56,7 @@ TPZGeoMesh* ReadMeshFromGmsh(std::string file_name);
 
 void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream &outfile);
 
-void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, double alpha, double tol, std::ofstream &outfile);
+void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha, REAL tol, std::ofstream &outfile);
 
 void PrintResults(TPZLinearAnalysis &an, TPZCompMesh *cmesh, int resolution = 0);
 
@@ -193,7 +193,7 @@ void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream
         outfile << "Time Solve Direct = " << std::chrono::duration_cast<std::chrono::milliseconds>(end2 - begin2).count() << "[ms]" << std::endl;
 }
 
-void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha, double tol, std::ofstream &outfile)
+void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha, REAL tol, std::ofstream &outfile)
 {
 #ifdef USING_MKL
     TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> strmat(cmesh);
@@ -352,7 +352,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         pressure(i,0) /= elArea[i];
     }
     
-    double norm_dsol=1.0, norm_rhs=1.0;
+    REAL norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
     const int size = rhs.Rows();
     while (norm_dsol > tol || norm_rhs > tol)
