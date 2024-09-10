@@ -86,7 +86,6 @@ int main(int argc, char *argv[])
     TPZLogger::InitializePZLOG(std::string(MESHES_DIR) + "/" + "log4cxx.cfg");
     #endif
 
-
     // Inputs
     const int xdiv = argc > 1 ? atoi(argv[1]) : 5;
     const int pOrder = argc > 2 ? atoi(argv[2]) : 2;
@@ -94,10 +93,10 @@ int main(int argc, char *argv[])
     bool useIterative = argc > 3 ? atoi(argv[3]) : 0;
     useIterative = true;
     REAL alpha = argc > 4 ? atof(argv[4]) : 0.001;
-    alpha = 0.1;
-    std::string output_name = "ndiv-" + std::to_string(xdiv) + "-p-" + std::to_string(pOrder) + "-iter-" + std::to_string(useIterative);
+    // alpha = 0.1;
+    std::string output_name = "darcy-ndiv-" + std::to_string(xdiv) + "-p-" + std::to_string(pOrder) + "-iter-" + std::to_string(useIterative);
     if (argc > 4)
-        output_name += "-alpha-" + std::string(argv[4]) + ".txt";
+        output_name += "-alpha-" + std::string(argv[4]);
     output_name += ".dat";
     std::ofstream outfile(output_name);
     
@@ -312,7 +311,6 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         row++;
     }
 
-    std::cout << "Element area " << elArea << std::endl;
     TPZFYsmpMatrix<STATE> BT(nElements,nFacetEqs);
     BT.SetData(iBT,jBT,valBT);
     
@@ -396,7 +394,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         if (!outfile.fail())
             outfile << "Iteration: " << nit << ". Time spent: " << iterativetime <<  ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
 
-        if (nit > 200)
+        if (nit > 50)
         {
             std::cout << "Solver diverged.\n";
             break;

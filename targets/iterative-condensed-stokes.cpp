@@ -130,9 +130,9 @@ int main(int argc, char *argv[])
         TPZVTKGeoMesh::PrintGMeshVTK(gmesh, out);
     }
 
-    std::string output_name = "ndiv-" + std::to_string(ndiv) + "-p-" + std::to_string(input.VelpOrder()) + "-iter-" + std::to_string(useIterative);
+    std::string output_name = "stokes-ndiv-" + std::to_string(ndiv) + "-p-" + std::to_string(input.VelpOrder()) + "-iter-" + std::to_string(useIterative);
     if (argc > 4)
-        output_name += "-alpha-" + std::string(argv[4]) + ".txt";
+        output_name += "-alpha-" + std::string(argv[4]);
     output_name += ".dat";
     std::ofstream outfile(output_name);
 
@@ -1145,7 +1145,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
         if (!outfile.fail())
             outfile << "Iteration: " << nit << ". Time spent: " << iterativetime << ". dsol_norm: " << norm_dsol << ", rhs_norm: " << norm_rhs << std::endl;
 
-        if (nit > 200)
+        if (nit > 50)
         {
             std::cout << "Solver diverged.\n";
             break;
