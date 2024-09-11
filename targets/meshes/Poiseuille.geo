@@ -1,7 +1,7 @@
 // Gmsh project created on Fri Aug 25 11:33:46 2023
 SetFactory("OpenCASCADE");
 
-el = 15;
+el = 60;
 ndiv = el + 1;
 
 L = 1.0;
