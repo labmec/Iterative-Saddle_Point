@@ -125,10 +125,6 @@ int main(int argc, char *argv[])
     // geometric mesh
     TPZGeoMesh *gmesh = CreateGMesh(&input);
     InsertLagrangeMultipliers(&input, gmesh);
-    {
-        std::ofstream out("gmesh.vtk");
-        TPZVTKGeoMesh::PrintGMeshVTK(gmesh, out);
-    }
 
     std::string output_name = "stokes-ndiv-" + std::to_string(ndiv) + "-p-" + std::to_string(input.VelpOrder()) + "-iter-" + std::to_string(useIterative);
     if (argc > 4)
@@ -1213,10 +1209,6 @@ void IterativeSolver(TPZGeoMesh* gmesh, ProblemData* inputData, REAL alpha, TPZA
     
     // static condensation
     CondenseElements(inputData, cmesh_m, gmesh, true);
-    {
-        std::ofstream cmeshFile("cmesh_m.txt");
-        cmesh_m->Print(cmeshFile);
-    }
 
     // Number of equations without condense elements
     const int nEquationsFull = cmesh_m->Solution().Rows();
@@ -1237,7 +1229,7 @@ void IterativeSolver(TPZGeoMesh* gmesh, ProblemData* inputData, REAL alpha, TPZA
     SolveProblemIterative(an, cmesh_m, alpha, 1.e-9, outfile);
 
     std::cout << "--------- PostProcess ---------" << std::endl;
-    PrintResults(an, cmesh_m, inputData->Resolution());
+    //PrintResults(an, cmesh_m, inputData->Resolution());
 }
 
 void DirectSolver(TPZGeoMesh* gmesh, ProblemData* inputData, TPZAnalyticSolution* sol, std::ofstream &outfile)
