@@ -66,12 +66,14 @@ void DirectSolver(TPZGeoMesh* gmesh, HDivFamily& hdivfam, int pOrder, std::ofstr
 
 //Analytical solution
 constexpr int solOrder{4};
+
+const int scale = 1.0;
 auto exactSol = [](const TPZVec<REAL> &loc,
     TPZVec<STATE>&u,
     TPZFMatrix<STATE>&gradU){
-    const auto &x=loc[0];
-    const auto &y=loc[1];
-    const auto &z=loc[2];
+    const auto &x=loc[0]/scale;
+    const auto &y=loc[1]/scale;
+    const auto &z=loc[2]/scale;
 
     REAL aux = 1./sinh(sqrt(2)*M_PI);
     u[0] = sin(M_PI*x)*sin(M_PI*y)*sinh(sqrt(2)*M_PI*z)*aux;
@@ -91,7 +93,6 @@ int main(int argc, char *argv[])
     const int pOrder = argc > 2 ? atoi(argv[2]) : 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
     bool useIterative = argc > 3 ? atoi(argv[3]) : 0;
-    useIterative = true;
     REAL alpha = argc > 4 ? atof(argv[4]) : 0.001;
     // alpha = 0.1;
     std::string output_name = "darcy-ndiv-" + std::to_string(xdiv) + "-p-" + std::to_string(pOrder) + "-iter-" + std::to_string(useIterative);
@@ -147,7 +148,7 @@ TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId)
     }
 
     TPZManVector<REAL,3> minX = {0,0,0};
-    TPZManVector<REAL,3> maxX = {1,1,1};
+    TPZManVector<REAL,3> maxX = {scale,scale,scale};
     int nMats = 2*dim+1;
 
     //all bcs share the same id
@@ -162,12 +163,15 @@ TPZGeoMesh* CreateGeoMesh(int xdiv, EMatid volId, EMatid bcId)
 
 void SolveProblemDirect(TPZLinearAnalysis &an, TPZCompMesh *cmesh, std::ofstream &outfile)
 {
-    TPZSkylineStructMatrix<STATE> matskl(cmesh); //caso simetrico
-    // TPZSSpStructMatrix<STATE,TPZStructMatrixOR<STATE>> matskl(cmesh);   
+#ifdef USING_MKL
+    TPZSSpStructMatrix<STATE, TPZStructMatrixOR<STATE>> strmat(cmesh);
+#else
+    TPZSkylineStructMatrix<STATE> strmat(cmesh);
+#endif
+
+    strmat.SetNumThreads(global_nthread);
     
-    matskl.SetNumThreads(global_nthread);
-    
-    an.SetStructuralMatrix(matskl);
+    an.SetStructuralMatrix(strmat);
     
     ///Setting a direct solver
     TPZStepSolver<STATE> step;
