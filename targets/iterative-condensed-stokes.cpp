@@ -789,7 +789,7 @@ void CondenseElements(ProblemData *inputData, TPZMultiphysicsCompMesh *cmesh_m, 
     std::set<int64_t> externalNodes;
     TPZStack<int64_t> groupIndex;
     TPZStack<TPZElementGroup*> elGroups;
-    int count = 0;
+    int64_t count = 0;
 
     std::set<int> BCsIDs;
     for (int i = 0; i < inputData->TangentialBCs().size(); i++)
@@ -822,7 +822,7 @@ void CondenseElements(ProblemData *inputData, TPZMultiphysicsCompMesh *cmesh_m, 
     }
 
     int64_t nGeoEl = gmesh->NElements();
-    for (int elgr = 0; elgr < elGroups.size(); elgr++)
+    for (int64_t elgr = 0; elgr < elGroups.size(); elgr++)
     {
         TPZElementGroup *groupEl = elGroups[elgr];
         TPZCompEl *compEl = groupEl->GetElGroup()[0];
@@ -997,7 +997,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
     TPZVec<STATE> elArea(nElements, 0.);
 
     int64_t row = 0;
-    int count = 0;
+    int64_t count = 0;
     for (int64_t iel = 0; iel < nel_u; iel++)
     {
         int64_t col = 0;
@@ -1100,7 +1100,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
 
     REAL norm_dsol = 1.0, norm_rhs = 1.0;
     int nit = 0;
-    const int size = rhs.Rows();
+    const int64_t size = rhs.Rows();
     while (norm_dsol > tol || norm_rhs > tol)
     {
         begin = std::chrono::steady_clock::now();
@@ -1211,13 +1211,13 @@ void IterativeSolver(TPZGeoMesh* gmesh, ProblemData* inputData, REAL alpha, TPZA
     CondenseElements(inputData, cmesh_m, gmesh, true);
 
     // Number of equations without condense elements
-    const int nEquationsFull = cmesh_m->Solution().Rows();
+    const int64_t nEquationsFull = cmesh_m->Solution().Rows();
     std::cout << "Number of equations before condensation = = " << nEquationsFull << std::endl;
     if (!outfile.fail())
         outfile << "Number of equations before condensation = " << nEquationsFull << std::endl;
 
     //Number of condensed problem.
-    int nEquationsCondensed = cmesh_m->NEquations();
+    int64_t nEquationsCondensed = cmesh_m->NEquations();
     std::cout << "Number of equations after condensation = " << nEquationsCondensed << std::endl;
     if (!outfile.fail())
         outfile << "Number of equations after condensation = " << nEquationsCondensed << std::endl;
@@ -1247,13 +1247,13 @@ void DirectSolver(TPZGeoMesh* gmesh, ProblemData* inputData, TPZAnalyticSolution
     CondenseElements(inputData, cmesh_m, gmesh);
 
     // Number of equations without condense elements
-    const int nEquationsFull = cmesh_m->Solution().Rows();
+    const int64_t nEquationsFull = cmesh_m->Solution().Rows();
     std::cout << "Number of equations before condensation = = " << nEquationsFull << std::endl;
     if (!outfile.fail())
         outfile << "Number of equations before condensation = " << nEquationsFull << std::endl;
 
     //Number of condensed problem.
-    int nEquationsCondensed = cmesh_m->NEquations();
+    int64_t nEquationsCondensed = cmesh_m->NEquations();
     std::cout << "Number of equations after condensation = " << nEquationsCondensed << std::endl;
     if (!outfile.fail())
         outfile << "Number of equations after condensation = " << nEquationsCondensed << std::endl;
@@ -1265,5 +1265,5 @@ void DirectSolver(TPZGeoMesh* gmesh, ProblemData* inputData, TPZAnalyticSolution
     SolveProblemDirect(an, cmesh_m, outfile);
 
     std::cout << "--------- PostProcess ---------" << std::endl;
-    PrintResults(an, cmesh_m, inputData->Resolution());
+    //PrintResults(an, cmesh_m, inputData->Resolution());
 }

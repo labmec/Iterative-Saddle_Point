@@ -258,7 +258,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
     TPZVec<STATE> elArea(nElements,0.);
 
     int64_t row = 0;
-    int count = 0;
+    int64_t count = 0;
     for (int64_t iel = 0; iel < nel_u; iel++)
     {
         int64_t col = 0;
@@ -356,7 +356,7 @@ void SolveProblemIterative(TPZLinearAnalysis &an, TPZCompMesh *cmesh, REAL alpha
     
     REAL norm_dsol=1.0, norm_rhs=1.0;
     int nit = 0;
-    const int size = rhs.Rows();
+    const int64_t size = rhs.Rows();
     while (norm_dsol > tol || norm_rhs > tol)
     {
         begin = std::chrono::steady_clock::now();
@@ -473,13 +473,13 @@ void IterativeSolver(TPZGeoMesh* gmesh, HDivFamily& hdivfam, int pOrder, REAL al
     TPZMultiphysicsCompMesh *cmesh = hdivCreator.CreateApproximationSpace();
   
     // Number of equations without condense elements
-    const int nEquationsFull = cmesh->Solution().Rows();
+    const int64_t nEquationsFull = cmesh->Solution().Rows();
     std::cout << "Number of equations before condensation = = " << nEquationsFull << std::endl;
     if (!outfile.fail())
         outfile << "Number of equations before condensation = " << nEquationsFull << std::endl;
 
     //Number of condensed problem.
-    int nEquationsCondensed = cmesh->NEquations();
+    int64_t nEquationsCondensed = cmesh->NEquations();
     std::cout << "Number of equations after condensation = " << nEquationsCondensed << std::endl;
     if (!outfile.fail())
         outfile << "Number of equations after condensation = " << nEquationsCondensed << std::endl;
@@ -523,11 +523,11 @@ void DirectSolver(TPZGeoMesh* gmesh, HDivFamily& hdivfam, int pOrder, std::ofstr
     TPZMultiphysicsCompMesh *cmesh = hdivCreator.CreateApproximationSpace();
   
     // Number of equations without condense elements
-    const int nEquationsFull = cmesh->Solution().Rows();
+    const int64_t nEquationsFull = cmesh->Solution().Rows();
     std::cout << "Number of equations = " << nEquationsFull << std::endl;
 
     //Number of condensed problem.
-    int nEquationsCondensed = cmesh->NEquations();
+    int64_t nEquationsCondensed = cmesh->NEquations();
     std::cout << "Number of equations condensed = " << nEquationsCondensed << std::endl;
 
     //Create analysis environment
