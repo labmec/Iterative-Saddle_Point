@@ -4,3 +4,5 @@ build
 LOG
 *.cfg
 *workspace
+Build-cmake
+

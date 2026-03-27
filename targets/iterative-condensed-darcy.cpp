@@ -92,10 +92,9 @@ int main(int argc, char *argv[])
     const int xdiv = argc > 1 ? atoi(argv[1]) : 5;
     const int pOrder = argc > 2 ? atoi(argv[2]) : 2;
     HDivFamily hdivfam = HDivFamily::EHDivConstant;
-    bool useIterative = argc > 3 ? atoi(argv[3]) : 0;
-    REAL alpha = argc > 4 ? atof(argv[4]) : 0.001;
-    // alpha = 0.1;
-    std::string output_name = "darcy-ndiv-" + std::to_string(xdiv) + "-p-" + std::to_string(pOrder) + "-iter-" + std::to_string(useIterative);
+    bool useIterative = argc > 3 ? atoi(argv[3]) : true;
+    REAL alpha = argc > 4 ? atof(argv[4]) : 0.1;
+    std::string output_name = "ndiv-" + std::to_string(xdiv) + "-p-" + std::to_string(pOrder) + "-iter-" + std::to_string(useIterative);
     if (argc > 4)
         output_name += "-alpha-" + std::string(argv[4]);
     output_name += ".dat";
